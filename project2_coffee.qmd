@@ -89,17 +89,17 @@ dataset |>
 ```{r}
 #remove the outliers
 vars <- c("aroma", "flavor", "acidity", "category_two_defects", "altitude_mean_meters", "harvested")
-quantiles99 <- dataset %>%
-  summarise(across(all_of(vars), ~ quantile(., 0.99, na.rm = TRUE)))
-print(quantiles99)
+quantiles85 <- dataset %>%
+  summarise(across(all_of(vars), ~ quantile(., 0.85, na.rm = TRUE)))
+print(quantiles85)
 coffee <- dataset %>%
   filter(
-    aroma <= quantiles99$aroma,
-    flavor <= quantiles99$flavor,
-    acidity <= quantiles99$acidity,
-    category_two_defects <= quantiles99$category_two_defects,
-    altitude_mean_meters <= quantiles99$altitude_mean_meters,
-    harvested <= quantiles99$harvested
+    aroma <= quantiles85$aroma,
+    flavor <= quantiles85$flavor,
+    acidity <= quantiles85$acidity,
+    category_two_defects <= quantiles85$category_two_defects,
+    altitude_mean_meters <= quantiles85$altitude_mean_meters,
+    harvested <= quantiles85$harvested
   )
 print(nrow(coffee))
 #Standardize altitude_mean_meters
@@ -116,6 +116,15 @@ coffee %>%
   as.data.frame() %>% 
   rownames_to_column(var = "Variable") %>%
   gt()
+```
+
+```{r}
+# Countries with a combined sample size of less than 10 as “Other”
+library(forcats)
+dataset$country_of_origin <- fct_lump_min(dataset$country_of_origin, min = 10, other_level = "Other")
+
+# Check the relationship between country and quality
+table(dataset$country_of_origin, dataset$Qualityclass)
 ```
 
 ## Data Visualization
@@ -220,11 +229,22 @@ summ(model3)
 ```{r}
 #| echo: true
 # Fit the GLM about Country
+# AIC = 348.68, BIC = 444.59 
 coffee$country_of_origin <- as.factor(coffee$country_of_origin)
 glm_model <- glm(Qualityclass ~ .,
                  data = coffee,
                  family = binomial(link = "logit"))
-summ(glm_model)
+# Stepwise regression using step()
+stepwise_glm <- step(glm_model, direction = "both", trace = 1)
+
+# View the final model Qualityclass ~ country_of_origin + aroma + flavor + acidity
+summary(stepwise_glm)
+summ(stepwise_glm)
+formula(stepwise_glm)
+# Checking for co-linearity
+vif(stepwise_glm)
+
+model4=stepwise_glm
 ```
 
 ## log_odds
