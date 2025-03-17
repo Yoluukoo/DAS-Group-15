@@ -15,7 +15,7 @@ execute:
   message: false
 ---
 
-```{r}  
+```{r}
 #| echo: true
 #| warning: false
 #| message: false
@@ -42,8 +42,7 @@ library(tibble)
 
 ```{r}
 #| echo: true
-setwd("M:/2025.3.7/group2")
-data <- read.csv("dataset15.csv")
+data <- read.csv("D:/study/analysis/project2/dataset15.csv")
 ```
 
 ```{r}
@@ -56,20 +55,13 @@ dataset$Qualityclass <- ifelse(dataset$Qualityclass == "Good", 1, 0)
 dataset$Qualityclass <- as.factor(dataset$Qualityclass)
 str(dataset)
 ```
-  
+
 ```{r}
 #Analyze the types and sizes of data
 dataset %>%
   group_by(country_of_origin) %>%
   summarise(count = n()) %>%
   arrange(desc(count))
-
-# Countries with a combined sample size of less than 10 as “Other”
-library(forcats)
-coffee$country_of_origin <- fct_lump_min(coffee$country_of_origin, min = 10, other_level = "Other")
-
-# Check the relationship between country and quality
-table(coffee$country_of_origin, coffee$Qualityclass)
 ```
 
 ```{r}
@@ -126,6 +118,14 @@ coffee %>%
   gt()
 ```
 
+```{r}
+# Countries with a combined sample size of less than 10 as “Other”
+library(forcats)
+dataset$country_of_origin <- fct_lump_min(dataset$country_of_origin, min = 10, other_level = "Other")
+
+# Check the relationship between country and quality
+table(dataset$country_of_origin, dataset$Qualityclass)
+```
 
 ## Data Visualization
 ```{r}
@@ -199,42 +199,36 @@ levels(coffee$Qualityclass)
 ```{r}
 #| echo: true
 # Fit the model
-# Qualityclass ~ aroma + flavor + acidity
-# AIC = 367.33, BIC = 384.77
-model <- glm(Qualityclass ~ aroma + flavor + acidity, data = coffee,
+model <- glm(Qualityclass ~ aroma + flavor + acidity + category_two_defects + altitude_mean_meters + harvested, data = coffee,
              family = binomial(link = "logit"))
-
-# View the final model
-summary(model)
+model %>%
+  summary()
 summ(model)
-# Checking for co-linearity
-vif(model)
 ```
 
 ```{r}
 #| echo: true
 # Fit the model2
-# AIC = 366.02, BIC = 387.82
-model2 <- glm(Qualityclass ~ aroma + flavor + acidity + category_two_defects + altitude_mean_meters + harvested, data = coffee,
-             family = binomial(link = "logit"))
+model2 <- glm(Qualityclass ~ aroma + flavor + acidity + altitude_mean_meters + harvested, 
+                     data = coffee, family = binomial(link = "logit"))
+model2 %>%
+  summary()
+summ(model2)
+```
 
-# Stepwise regression using step()
-stepwise_glm <- step(model2, direction = "both", trace = 1)
-
-# View the final model2
-summary(stepwise_glm)
-summ(stepwise_glm)
-# Qualityclass ~ aroma + flavor + acidity + altitude_mean_meters
-formula(stepwise_glm)
-# Checking for co-linearity
-vif(stepwise_glm)
-model2=stepwise_glm
+```{r}
+#| echo: true
+# Fit the model3
+model3 <- glm(Qualityclass ~ aroma + flavor + acidity +  harvested, 
+              data = coffee, family = binomial(link = "logit"))
+model3 %>%
+  summary()
+summ(model3)
 ```
 
 ```{r}
 #| echo: true
 # Fit the GLM about Country
-# country factor
 # AIC = 348.68, BIC = 444.59 
 coffee$country_of_origin <- as.factor(coffee$country_of_origin)
 glm_model <- glm(Qualityclass ~ .,
@@ -243,51 +237,7 @@ glm_model <- glm(Qualityclass ~ .,
 # Stepwise regression using step()
 stepwise_glm <- step(glm_model, direction = "both", trace = 1)
 
-# View the final model
-summary(stepwise_glm)
-summ(stepwise_glm)
-formula(stepwise_glm)
-# Checking for co-linearity
-vif(stepwise_glm)
-
-model3=stepwise_glm
-```
-
-```{r}
-#| echo: true
-# # Fit the GLM about country_group 
-# AIC = 347.90, BIC = 369.70 
-
-# coffee=coffee[,-ncol(coffee)]
-# Group by country_of_origin and calculate the number of samples for Qualityclass 0 and 1
-country_counts <- coffee %>%
-  group_by(country_of_origin) %>%
-  summarise(
-    q0 = sum(Qualityclass == 0),  # Number of samples with Qualityclass = 0
-    q1 = sum(Qualityclass == 1)   # Number of samples with Qualityclass = 1
-  )
-country_counts <- country_counts %>%
-  mutate(
-    country_group = case_when(
-      q1 >= q0  ~ "more good",     # More samples with Qualityclass = 1
-      q1 < q0 ~ "more poor",     # More samples with Qualityclass = 0
-    )
-  )
-# Merge the grouping information back into the original data
-coffee <- coffee %>%
-  left_join(country_counts %>% select(country_of_origin, country_group), by = "country_of_origin")
-# Check the distribution of the new country_group variable
-table(coffee$country_group)
-
-coffee$country_group <- as.factor(coffee$country_group)
-
-glm_model <- glm(Qualityclass ~ . - country_of_origin,
-                 data = coffee,
-                 family = binomial(link = "logit"))
-# Stepwise regression using step()
-stepwise_glm <- step(glm_model, direction = "both", trace = 1)
-
-# View the final model
+# View the final model Qualityclass ~ country_of_origin + aroma + flavor + acidity
 summary(stepwise_glm)
 summ(stepwise_glm)
 formula(stepwise_glm)
@@ -297,28 +247,18 @@ vif(stepwise_glm)
 model4=stepwise_glm
 ```
 
-```{r}
-#| echo: true
-# Likelihood Ratio Test (LRT), used to compare the goodness of fit between two GLM models
-# Determines whether adding more parameters significantly improves the model's explanatory power for the data.
-library(lmtest)
-lrtest(model2, model)
-lrtest(model3, model)
-lrtest(model4, model)
-```
-
 ## log_odds
 ```{r}
 #| echo: true
 #estimated coefficients
-mod1coefs <- round(coef(model4),2)
+mod1coefs <- round(coef(model2),2)
 ```
 
 ```{r}
 #| echo: true
 #| label: tbl-logodds95%CI
 #| tbl-cap: 95% Confidence Interval for the Log-odds
-confint(model4) %>%
+confint(model2) %>%
   kable()
 ```
 
@@ -326,14 +266,14 @@ confint(model4) %>%
 #| echo: true
 #| label: fig-95%logCIplot
 #| fig-cap: 95% Confidence Interval Plot for Log-Odds
-plot_model(model4, show.values = TRUE, transform = NULL,
+plot_model(model2, show.values = TRUE, transform = NULL,
            title = "Log-Odds (Coffee Quanlityclass score)", show.p = FALSE)
 ```
 
 ```{r}
 # Add log-odds to the dataset
 coffee <- coffee %>%
-  mutate(logodds.poor = predict(model4))
+  mutate(logodds.poor = predict(model2))
 ```
 
 ## odd ratio
@@ -341,7 +281,7 @@ coffee <- coffee %>%
 #| echo: true
 #| label: tbl-odds_scale
 #| tbl-cap: Summary Table on the Odds Scale
-model4 %>%
+model2 %>%
   coef() %>%
   exp() %>%
   as.data.frame() %>% 
@@ -353,7 +293,7 @@ model4 %>%
 #| echo: true
 #| label: fig-95%CIplot
 #| fig-cap: 95% Confidence Interval Plot for Odds
-plot_model(model4, show.values = TRUE, 
+plot_model(model2, show.values = TRUE, 
            title = "Odds (poor instructor)", show.p = FALSE)
 ```
 
@@ -367,7 +307,7 @@ coffee <- coffee %>%
 ```{r}
 # Add probability to the dataset.
 coffee <- coffee %>%
-  mutate(probs.poor = fitted(model4))
+  mutate(probs.poor = fitted(model2))
 ```
 
 ```{r}
@@ -434,36 +374,6 @@ ggplot(data = coffee, aes(x = harvested, y = probs.poor)) +
               method.args = list(family="binomial"), 
               se = FALSE) +
   labs(x = "harvested", y = "Probability of quanilityclass being poor")
-```
-
-```{r}
-# Model test
-library(caret) 
-# Generate predicted probabilities
-predicted <- predict(model4, type = "response") 
-# convert probabilities into class labels, and create a confusion matrix
-confusionMatrix(as.factor(ifelse(predicted > 0.5, 1, 0)), as.factor(coffee$Qualityclass))
-```
-
-```{r}
-#| echo: true
-#| label: Predicted Effect Plot
-#| fig-cap: Effect of Aroma, Flavor, and Acidity on Predicted Coffee Quality
-# Shows how acidity, flavor, and aroma together influence the predicted probability of coffee quality categories.
-
-# compute the CI, undoes odds, turn it back into a probability
-
-# This indicates that under high acidity, an increase in flavor and aroma significantly enhances the probability of high quality.
-
-plot_model(model4, type="pred", terms=c("aroma","flavor","acidity"  ))
-```
-
-```{r}
-#| echo: true
-#| label: Predicted Effect Plot2
-#| fig-cap: Predicted Effect of Flavor and Acidity on Coffee Quality Across Country Groups
-plot_model(model4, type="pred", terms=c("flavor","acidity" ,"country_group" ))
-# two groups have different, but have same kind of distribution shapes
 ```
 
 # Conclusion
