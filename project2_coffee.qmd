@@ -426,14 +426,6 @@ ggplot(data = coffee, aes(x = harvested, y = probs.poor)) +
   labs(x = "harvested", y = "Probability of quanilityclass being poor")
 ```
 
-```{r}
-# Model test
-library(caret) 
-# Generate predicted probabilities
-predicted <- predict(model4, type = "response") 
-# convert probabilities into class labels, and create a confusion matrix
-confusionMatrix(as.factor(ifelse(predicted > 0.5, 1, 0)), as.factor(coffee$Qualityclass))
-```
 
 ```{r}
 #| echo: true
